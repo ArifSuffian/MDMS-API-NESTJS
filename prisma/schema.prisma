@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// TODO: Make sure the ID is consistent throughout the different types of user models
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  firstName    String?
+  lastName     String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Specific user roles
+  student  Student?
+  lecturer Lecturer?
+}
+
+model File {
+  id         String      @id @default(cuid())
+  filename   String
+  mimetype   String
+  path       String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  submission Submission?
+}
+
+model Lecturer {
+  id          String       @id @default(cuid())
+  userId      String       @unique
+  user        User         @relation(fields: [userId], references: [id])
+  staffNumber String       @unique
+  nominations Nomination[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  supervisor  Supervisor? // an admin will assign a student to a supervisor which is a lecturer
+  examiner    Examiner? // a lecturer can be an examiner, when a nomination is accepted
+}
+
+// Student-specific data
+model Student {
+  id                    String       @id @default(cuid())
+  userId                String       @unique
+  user                  User         @relation(fields: [userId], references: [id])
+  matricNumber          String       @unique
+  submissions           Submission[]
+  supervisorId          String?
+  supervisor            Supervisor?  @relation(fields: [supervisorId], references: [id])
+  project               Project?
+  viva                  Viva?
+  progress1Date         DateTime?
+  progress1Completed    Boolean?
+  progress2Date         DateTime?
+  progress2Completed    Boolean?
+  finalReportDate       DateTime?
+  finalReportCompleted  Boolean?
+  presentationDate      DateTime?
+  presentationCompleted Boolean?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+}
+
+// Supervisor-specific data
+model Supervisor {
+  id         String    @id @default(cuid())
+  lecturerId String    @unique
+  lecturer   Lecturer  @relation(fields: [lecturerId], references: [id])
+  students   Student[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+// Examiner-specific data
+model Examiner {
+  id         String   @id @default(cuid())
+  lecturerId String   @unique
+  lecturer   Lecturer @relation(fields: [lecturerId], references: [id])
+  vivas      Viva[]   @relation("vivasParticipated")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Submission {
+  id        String   @id @default(cuid())
+  title     String
+  content   String // We'll use this field to store the submission type
+  feedback  String?
+  studentId String
+  fileId    String   @unique
+  file      File     @relation(fields: [fileId], references: [id])
+  student   Student  @relation(fields: [studentId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Viva {
+  id          String       @id @default(cuid())
+  topic       String
+  studentId   String       @unique
+  student     Student      @relation(fields: [studentId], references: [id])
+  vivaDate    DateTime? // Date of the viva, it is scheduled when the nomination is accepted
+  evaluation  String? // Evaluation of the viva, given by the examiners
+  passed      Boolean? // Whether the student passed the viva or not
+  examiners   Examiner[]   @relation("vivasParticipated")
+  nominations Nomination[] @relation("nominations")
+  project     Project?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  studentId   String   @unique
+  subjectArea String
+  projectType String
+  student     Student  @relation(fields: [studentId], references: [id])
+  vivaId      String   @unique
+  viva        Viva     @relation(fields: [vivaId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Nomination {
+  id         String   @id @default(cuid())
+  details    String
+  lecturerId String
+  accepted   Boolean  @default(false)
+  rejected   Boolean  @default(false)
+  lecturer   Lecturer @relation(fields: [lecturerId], references: [id])
+  vivas      Viva[]   @relation("nominations")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+}
